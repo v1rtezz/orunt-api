@@ -1,0 +1,16 @@
+# файлы курсора и данные
+orunt_cursor.txt
+*cursor*.txt
+*.cursor
+*.tmp
+orders.csv
+
+# секреты
+.env
+.env.*
+
+# мусор
+__pycache__/
+*.pyc
+node_modules/
+.DS_Store

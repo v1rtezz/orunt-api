@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orunt API: примеры клиентов</title>
+<meta name="description" content="Примеры клиентов личного API Orunt на Python, Node.js, Bash и n8n: long-poll ленты заказов с бирж фриланса, курсор, обработка ошибок 409 и 429.">
+<style>
+  :root { --bg:#fafaf7; --fg:#1d2330; --muted:#5b6475; --line:#e3e5ea; --card:#fff; --accent:#2a5bd7; --code:#f1f3f7; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 48px 20px 64px; }
+  h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 12px; }
+  h2 { font-size: 1.3rem; margin: 40px 0 12px; }
+  p, li { color: var(--fg); }
+  .lead { font-size: 1.1rem; color: var(--muted); }
+  a { color: var(--accent); }
+  pre { background: var(--code); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: .9rem; line-height: 1.5; }
+  code { font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size: .92em; }
+  :not(pre) > code { background: var(--code); padding: 1px 5px; border-radius: 5px; }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: #f4f5f8; font-weight: 600; }
+  tr:last-child td { border-bottom: 0; }
+  .note { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; padding: 12px 16px; color: var(--muted); }
+  footer { margin-top: 48px; color: var(--muted); font-size: .9rem; }
+  ul.links { padding-left: 20px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Orunt API: примеры клиентов</h1>
+  <p class="lead"><a href="https://orunt.pro/">Orunt</a> — Telegram-бот @oruntbot для фрилансеров: следит за Profi.ru, Kwork, FL.ru, YouDo, Freelance.ru, Freelancehunt и Telegram-каналами и присылает подходящие заказы за 5–10 секунд. Личный API отдаёт ту же ленту заказов вашим собственным инструментам. Здесь собраны рабочие примеры клиентов.</p>
+
+  <h2>Быстрый старт</h2>
+  <ol>
+    <li>В боте @oruntbot: Настройки → API → Выпустить ключ. Доступ есть на тарифе PRO; бот показывает ключ один раз.</li>
+    <li>Запустите пример с вашим ключом в переменной окружения:</li>
+  </ol>
+<pre><code>export ORUNT_API_KEY=orunt_...
+
+python3 examples/python/poll_orders.py   # requests
+node examples/node/poll.mjs              # Node.js 20+
+bash examples/bash/poll.sh               # curl + jq</code></pre>
+  <p>Под капотом один цикл long-poll. Курсор из <code>next_cursor</code> передаётся в <code>since</code> следующего запроса:</p>
+<pre><code>curl -sG https://orunt.pro/api/v1/me/orders \
+  -H "Authorization: Bearer $ORUNT_API_KEY" \
+  --data-urlencode "wait=50" \
+  --data-urlencode "since=v1:84211"</code></pre>
+  <p>Ответ содержит <code>orders</code>, <code>next_cursor</code> и <code>has_more</code>. Ключ передаётся только в заголовке.</p>
+
+  <h2>Примеры</h2>
+  <table>
+    <tr><th>Файл</th><th>Что делает</th></tr>
+    <tr><td><a href="https://github.com/v1rtezz/orunt-api/blob/main/examples/python/poll_orders.py">examples/python/poll_orders.py</a></td><td>Клиент long-poll на requests, курсор в файле</td></tr>
+    <tr><td><a href="https://github.com/v1rtezz/orunt-api/blob/main/examples/python/to_csv.py">examples/python/to_csv.py</a></td><td>Новые заказы в CSV</td></tr>
+    <tr><td><a href="https://github.com/v1rtezz/orunt-api/blob/main/examples/node/poll.mjs">examples/node/poll.mjs</a></td><td>То же на Node.js 20+</td></tr>
+    <tr><td><a href="https://github.com/v1rtezz/orunt-api/blob/main/examples/bash/poll.sh">examples/bash/poll.sh</a></td><td>То же на curl и jq</td></tr>
+    <tr><td><a href="https://github.com/v1rtezz/orunt-api/blob/main/examples/n8n/README.md">examples/n8n/README.md</a></td><td>Лента в n8n через HTTP Request</td></tr>
+  </table>
+
+  <h2>Устойчивость клиента</h2>
+  <ul>
+    <li>Один цикл на ключ: второй одновременный long-poll получит <code>409</code>; ждите <code>Retry-After</code> секунд.</li>
+    <li><code>429</code>: ждите <code>Retry-After</code> секунд.</li>
+    <li><code>502</code>, <code>503</code>, <code>504</code>: сервер обновляется, повторяйте с паузами 5, 10, 20, 60 секунд, курсор не теряйте.</li>
+    <li><code>401</code> и <code>403</code>: остановитесь.</li>
+  </ul>
+
+  <h2>Условия использования</h2>
+  <p class="note">Ключ личный, только для ваших собственных инструментов: свои уведомления, CRM, аналитика. Нельзя передавать ключ, доступ или заказы другим людям, делать многопользовательские и публичные сервисы, публиковать данные и использовать ленту в коммерческих целях. Нарушение ведёт к отзыву ключа и подписки без возврата средств. Полный текст — в <a href="https://orunt.pro/api/v1/docs">документации API</a>.</p>
+
+  <h2>Ссылки</h2>
+  <ul class="links">
+    <li><a href="https://orunt.pro/">orunt.pro</a></li>
+    <li><a href="https://orunt.pro/api/v1/docs">Документация API</a></li>
+    <li><a href="https://orunt.pro/tarify/">Тарифы</a></li>
+    <li><a href="https://orunt.pro/profi/">Заказы Profi.ru в Telegram</a></li>
+    <li><a href="https://github.com/v1rtezz/orunt-api/blob/main/README.md">README репозитория</a></li>
+  </ul>
+
+  <footer>Код примеров — MIT, © 2026 Orunt. Доступ к API определяется условиями Orunt.</footer>
+</main>
+</body>
+</html>
